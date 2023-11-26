@@ -1,0 +1,147 @@
+require:
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.2
+  DisplayCopNames: true
+  NewCops: enable
+
+Layout/DotPosition:
+  EnforcedStyle: leading
+
+Layout/SpaceInsideArrayLiteralBrackets:
+  EnforcedStyle: no_space
+
+Layout/LineLength:
+  Max: 120
+
+Layout/MultilineArrayBraceLayout:
+  EnforcedStyle: new_line
+
+Layout/MultilineHashBraceLayout:
+  EnforcedStyle: new_line
+
+Layout/MultilineMethodCallBraceLayout:
+  EnforcedStyle: new_line
+
+Layout/FirstArgumentIndentation:
+  EnforcedStyle: consistent
+
+Lint/AmbiguousBlockAssociation:
+  Enabled: true
+  AllowedMethods: [change, not_change]
+
+Metrics/BlockLength:
+  Max: 80
+  Exclude:
+    - "spec/**/*.rb"
+
+Metrics/MethodLength:
+  Max: 40
+  Exclude:
+    - "spec/**/*.rb"
+
+Metrics/ParameterLists:
+  Max: 3
+  CountKeywordArgs: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/BlockNesting:
+  Max: 5
+  Exclude:
+    - "spec/**/*.rb"
+
+Metrics/ClassLength:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/ModuleLength:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/SymbolArray:
+  EnforcedStyle: brackets
+
+Style/WordArray:
+  EnforcedStyle: brackets
+
+# All lambda will be like `->() {}`, `->() do end`.
+Style/Lambda:
+  EnforcedStyle: literal
+
+Style/ConditionalAssignment:
+  Enabled: false
+
+Style/EmptyMethod:
+  EnforcedStyle: expanded
+
+Style/SingleLineMethods:
+  AllowIfMethodIsEmpty: false
+
+Style/FormatStringToken:
+  Enabled: false
+
+Style/BlockDelimiters:
+  Enabled: true
+  BracesRequiredMethods: ['expect', 'change']
+
+# internal concerns must be written in compact style.
+# classes in a namespace should be written in expanded style.
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+RSpec/NamedSubject:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/SharedExamples:
+  Enabled: false
+
+RSpec/ExpectChange:
+  Enabled: true
+  EnforcedStyle: block
+
+RSpec/ChangeByZero:
+  Enabled: true
+  NegatedMatcher: not_change
+
+RSpec/SpecFilePathFormat:
+  Enabled: false
+
+RSpec/MultipleMemoizedHelpers:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Enabled: true
+  Max: 5
+
+RSpec/LetSetup:
+  Enabled: true
+  Exclude:
+    - 'spec/support/contexts/**/*.rb'
+    - 'spec/support/examples/**/*.rb'
