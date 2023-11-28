@@ -3,7 +3,7 @@
 require 'prometheus_exporter/metric'
 
 module PrometheusExporter::Ext::Metric
-  class GaugeWithTime < Gauge
+  class GaugeWithTime < PrometheusExporter::Metric::Gauge
     attr_reader :timestamps
 
     def reset!

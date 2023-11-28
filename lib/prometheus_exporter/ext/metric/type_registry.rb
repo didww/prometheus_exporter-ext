@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/metric'
-require 'prometheus_exporter/ext/metric/gauge_with_time'
+require_relative 'gauge_with_time'
 
 module PrometheusExporter::Ext::Metric
   module TypeRegistry
