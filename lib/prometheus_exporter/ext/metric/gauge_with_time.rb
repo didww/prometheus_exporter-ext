@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/metric'
+require 'date'
 
 module PrometheusExporter::Ext::Metric
   class GaugeWithTime < PrometheusExporter::Metric::Gauge
@@ -39,6 +40,10 @@ module PrometheusExporter::Ext::Metric
       result = super
       update_timestamp(labels)
       result
+    end
+
+    def to_h
+      super.to_h { |labels, value| [labels, [value, timestamps[labels]]] }
     end
 
     private
