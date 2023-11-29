@@ -76,14 +76,14 @@ RSpec.describe PrometheusExporter::Ext::Metric::GaugeWithTime do
       before do
         metric.observe(1, 'foo' => 'bar')
         sleep 0.2
-        metric.observe(2, 'baz' => 'boo')
+        metric.observe(2, baz: 'boo')
       end
 
       it 'has correct to_h' do
         expect(metric.to_h).to match(
           {
             { 'foo' => 'bar' } => [1, ms_since_epoch],
-            { 'baz' => 'boo' } => [2, ms_since_epoch]
+            { baz: 'boo' } => [2, ms_since_epoch]
           }
         )
       end

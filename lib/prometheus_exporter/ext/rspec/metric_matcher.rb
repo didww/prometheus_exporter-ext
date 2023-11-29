@@ -27,7 +27,9 @@ module PrometheusExporter::Ext::RSpec
 
       return false unless values_match?(metric_class, actual.class)
       return false unless values_match?(metric_name, actual.name.to_s)
-      return false if !metric_payload.nil? && !values_match?(metric_payload, actual.to_h)
+
+      actual_payload = actual.to_h.transform_keys { |labels| labels.transform_keys(&:to_s) }
+      return false if !metric_payload.nil? && !values_match?(metric_payload, actual_payload)
 
       true
     end
