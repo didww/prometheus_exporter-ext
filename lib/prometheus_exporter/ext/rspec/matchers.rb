@@ -2,9 +2,14 @@
 
 require 'date'
 require_relative 'metric_matcher'
+require_relative 'send_metrics_matcher'
 
 module PrometheusExporter::Ext::RSpec
   module Matchers
+    def send_metrics(expected = nil)
+      PrometheusExporter::Ext::RSpec::SendMetricsMatcher.new(expected)
+    end
+
     def a_prometheus_metric(klass, name)
       MetricMatcher.new(klass, name)
     end
