@@ -47,7 +47,7 @@ begin
   MyOperation.run
 ensure
   duration = Time.current.to_i - time_start
-  Prometheus::MyInstrumentation.new.collect(duration)
+  Prometheus::MyInstrumentation.new.collect(duration, 'my_operation')
   ## you can add additional labels or override client
   Prometheus::MyInstrumentation.new(
     client: PrometheusExporter::Client.new(...),
@@ -83,7 +83,7 @@ require 'prometheus_exporter/ext'
 require 'prometheus_exporter/ext/instrumentation/periodic_stats'
 
 module Prometheus
-  class MyInstrumentation < ::PrometheusExporter::Ext::Instrumentation::PeriodicStats
+  class MyPeriodicInstrumentation < ::PrometheusExporter::Ext::Instrumentation::PeriodicStats
     self.type = 'my'
 
     def collect
@@ -129,6 +129,66 @@ module Prometheus
     # It will replace data with same labels and recalculate timestamp.
     register_metric :last_processed_duration, :gauge_with_time, 'duration of last processed record'
     register_metric :processed_count, :gauge_with_time, 'count of processed records'
+  end
+end
+```
+
+### You also can easily test your instrumentations and collectors using new matchers
+
+instrumentation test
+```ruby
+require 'prometheus_exporter/ext/rspec'
+
+RSpec.describe Prometheus::MyInstrumentation do
+  describe '#collect' do
+    subject { described_class.new.collect(duration, operation) }
+    let(:duration) { 1.23 }
+    let(:operation) { 'test' }
+
+    it 'sends prometheus metrics' do
+      expect { subject }.to send_metrics(
+        [
+          type: 'my',
+          metric_labels: {},
+          labels: { operation_name: operation },
+          last_duration_seconds: duration,
+          duration_seconds_sum: duration,
+          duration_seconds_count: 1
+        ]
+      )
+    end
+  end
+end
+```
+
+collector test
+```ruby
+RSpec.describe Prometheus::MyCollector do
+  describe '#collect' do
+    subject do
+      collector.collect(metric.deep_stringify_keys)
+    end
+
+    let(:collector) { described_class.new }
+    let(:metric) do
+      {
+        type: 'my',
+        metric_labels: {},
+        labels: { operation_name: 'test' },
+        last_duration_seconds: 1.2,
+        duration_seconds_sum: 3,4,
+        duration_seconds_count: 1
+      }
+    end
+
+    it 'observes prometheus metrics' do
+      subject
+      expect(collector.metrics).to contain_exactly(
+        a_gauge_with_time_metric('my_last_duration_seconds').with([1.2, ms_since_epoch], metric[:labels]),
+        a_counter_metric('my_duration_seconds_sum').with(3.4, metric[:labels]),
+        a_counter_metric('my_duration_seconds_count').with(1, metric[:labels])
+      )
+    end
   end
 end
 ```
