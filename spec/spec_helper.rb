@@ -1,7 +1,19 @@
 # frozen_string_literal: true
 
+require 'prometheus_exporter'
 require 'prometheus_exporter/ext'
-require 'prometheus_exporter/ext/rspec/matchers'
+require 'prometheus_exporter/ext/rspec'
+require 'prometheus_exporter/ext/instrumentation/base_stats'
+
+class TestInstrumentation < PrometheusExporter::Ext::Instrumentation::BaseStats
+  self.type = 'test'
+
+  def collect(data_list)
+    data_list.each do |data|
+      collect_data(data)
+    end
+  end
+end
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
@@ -13,6 +25,4 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
-
-  config.include PrometheusExporter::Ext::RSpec::Matchers
 end
