@@ -26,16 +26,95 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
       [
         {
           type: 'test',
-          foo: 123, bar: 456,
+          foo: 123,
+          bar: 456,
           labels: { qwe: 'asd' }
         },
         {
           type: 'test',
-          foo: 124, bar: 457,
+          foo: 124,
+          bar: 457,
           labels: { qwe: 'zxc' }
         }
       ]
     )
+  end
+
+  context 'when data has no labels' do
+    let(:data_list) do
+      [
+        { foo: 123, bar: 456 },
+        { foo: 124, bar: 457 }
+      ]
+    end
+
+    it 'sends correct metrics' do
+      expect { subject }.to send_metrics(
+        [
+          {
+            type: 'test',
+            foo: 123,
+            bar: 456,
+            labels: {}
+          },
+          {
+            type: 'test',
+            foo: 124,
+            bar: 457,
+            labels: {}
+          }
+        ]
+      )
+    end
+  end
+
+  context 'when some data was sent previously' do
+    before do
+      instrumentation.collect([foo: 1, bar: 2, labels: { aaa: 'bbb' }])
+    end
+
+    it 'sends correct metrics' do
+      expect { subject }.to send_metrics(
+        [
+          {
+            type: 'test',
+            foo: 123,
+            bar: 456,
+            labels: { qwe: 'asd' }
+          },
+          {
+            type: 'test',
+            foo: 124,
+            bar: 457,
+            labels: { qwe: 'zxc' }
+          }
+        ]
+      )
+    end
+  end
+
+  context 'when instrumentation has metric_labels' do
+    let(:instrumentation) { TestInstrumentation.new(metric_labels:) }
+    let(:metric_labels) { { host: 'example.com' } }
+
+    it 'sends correct metrics' do
+      expect { subject }.to send_metrics(
+        [
+          {
+            type: 'test',
+            foo: 123,
+            bar: 456,
+            labels: { qwe: 'asd', host: 'example.com' }
+          },
+          {
+            type: 'test',
+            foo: 124,
+            bar: 457,
+            labels: { qwe: 'zxc', host: 'example.com' }
+          }
+        ]
+      )
+    end
   end
 
   context 'with empty data list' do
