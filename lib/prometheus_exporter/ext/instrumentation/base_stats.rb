@@ -29,12 +29,12 @@ module PrometheusExporter::Ext::Instrumentation
       @client.send_json(metric)
     end
 
-    # @param datum [Hash]
+    # @param data [Hash]
     # @return [Hash]
-    def build_metric(datum)
-      metric = datum.dup
+    def build_metric(data)
+      metric = data.dup
       metric[:type] = type
-      metric[:metric_labels] = @metric_labels
+      metric[:labels] = (metric[:labels] || {}).merge(@metric_labels)
       metric
     end
   end
