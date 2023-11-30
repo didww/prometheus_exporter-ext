@@ -27,14 +27,12 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
         {
           type: 'test',
           foo: 123, bar: 456,
-          labels: { qwe: 'asd' },
-          metric_labels: {}
+          labels: { qwe: 'asd' }
         },
         {
           type: 'test',
           foo: 124, bar: 457,
-          labels: { qwe: 'zxc' },
-          metric_labels: {}
+          labels: { qwe: 'zxc' }
         }
       ]
     )

@@ -59,7 +59,7 @@ module PrometheusExporter::Ext::Server
       def build_labels(obj)
         labels = {}
         labels.merge!(obj['labels']) if obj['labels']
-        labels.merge!(obj['metric_labels']) if obj['metric_labels']
+        labels.merge!(obj['custom_labels']) if obj['custom_labels']
 
         labels
       end
