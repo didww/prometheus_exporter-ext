@@ -1,5 +1,7 @@
 # PrometheusExporter::Ext
 
+![Tests](https://github.com/didww/prometheus_exporter-ext/workflows/Tests/badge.svg)
+
 Extended Prometheus Exporter for Ruby
 
 ## Installation
