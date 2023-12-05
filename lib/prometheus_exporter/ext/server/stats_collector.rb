@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative '../metric/type_registry'
+require_relative 'base_collector_methods'
 
 module PrometheusExporter::Ext::Server
   module StatsCollector
@@ -9,67 +9,26 @@ module PrometheusExporter::Ext::Server
 
       def included(klass)
         super
-        klass.singleton_class.attr_accessor :type, :registered_metrics
-        klass.registered_metrics = {}
-        klass.extend ClassMethods
-        klass.include InstanceMethods
+        klass.include BaseCollectorMethods
       end
     end
 
-    module ClassMethods
-      # rubocop:disable Metrics/ParameterLists
-      def register_metric(name, type, help, *args)
-        # rubocop:enable Metrics/ParameterLists
-        name = name.to_s
-        raise ArgumentError, "metric #{name} is already registered" if registered_metrics.key?(name)
-
-        metric_class = PrometheusExporter::Ext::Metric::TypeRegistry.find_metric_class(type)
-        registered_metrics[name] = { help:, metric_class:, args: }
-      end
+    def initialize
+      super
+      @observers = build_observers
     end
 
-    module InstanceMethods
-      def initialize
-        super
-        build_observers
-      end
+    # Returns all metrics collected by this collector.
+    # @return [Array<PrometheusExporter::Metric::Base>]
+    def metrics
+      @observers.values
+    end
 
-      def type
-        self.class.type
-      end
-
-      def metrics
-        @observers.values
-      end
-
-      def collect(obj)
-        labels = build_labels(obj)
-        fill_observers(obj, labels)
-      end
-
-      private
-
-      def fill_observers(obj, labels)
-        @observers.each do |name, observer|
-          value = obj[name]
-          observer.observe(value, labels) if value
-        end
-      end
-
-      def build_labels(obj)
-        labels = {}
-        labels.merge!(obj['labels']) if obj['labels']
-        labels.merge!(obj['custom_labels']) if obj['custom_labels']
-
-        labels
-      end
-
-      def build_observers
-        @observers = self.class.registered_metrics.to_h do |name, metric|
-          observer = metric[:metric_class].new("#{type}_#{name}", metric[:help], *metric[:args])
-          [name, observer]
-        end
-      end
+    # Collects metric data received from client.
+    # @param obj [Hash] metric data.
+    def collect(obj)
+      obj = normalize_labels(obj)
+      fill_observers(@observers, obj)
     end
   end
 end

@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
-RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
+RSpec.describe PrometheusExporter::Ext::Server::ExpiredStatsCollector do
   subject do
-    collector.collect(stringified_metric)
+    collector.collect(deep_stringify_keys(metric))
   end
 
-  let(:collector) { TestStatsCollector.new }
-  let(:stringified_metric) { JSON.parse JSON.generate(metric) }
+  let(:collector) { TestExpiredCollector.new }
   let(:metric) do
     {
       type: 'test',
       labels: { qwe: 'asd' },
       g_metric: 1.23,
+      gwt_metric: 4.56,
       c_metric: 7.89
     }
   end
@@ -55,7 +55,6 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
   end
 
   context 'when collector has previous metrics with same labels' do
-    let(:prev_stringified_metric) { JSON.parse JSON.generate(prev_metric) }
     let(:prev_metric) do
       {
         type: 'test',
@@ -67,14 +66,14 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
     end
 
     before do
-      collector.collect(prev_stringified_metric)
+      collector.collect(deep_stringify_keys(prev_metric))
     end
 
     it 'observes prometheus metrics' do
       subject
       expect(collector.metrics).to contain_exactly(
         a_gauge_metric('test_g_metric').with(1.23, expected_labels),
-        a_counter_metric('test_c_metric').with(37.89, expected_labels)
+        a_counter_metric('test_c_metric').with(7.89, expected_labels) # was replaced, not incremented
       )
     end
   end
@@ -106,6 +105,21 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
           .with(30, prev_expected_labels)
           .with(7.89, expected_labels)
       )
+    end
+
+    context 'when previous metrics are expired' do
+      before do
+        sleep_seconds = collector.class.ttl + 0.1
+        sleep(sleep_seconds)
+      end
+
+      it 'observes prometheus metrics' do
+        subject
+        expect(collector.metrics).to contain_exactly(
+          a_gauge_metric('test_g_metric').with(1.23, expected_labels),
+          a_counter_metric('test_c_metric').with(7.89, expected_labels)
+        )
+      end
     end
   end
 end

@@ -23,20 +23,18 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
 
   it 'sends correct metrics' do
     expect { subject }.to send_metrics(
-      [
-        {
-          type: 'test',
-          foo: 123,
-          bar: 456,
-          labels: { qwe: 'asd' }
-        },
-        {
-          type: 'test',
-          foo: 124,
-          bar: 457,
-          labels: { qwe: 'zxc' }
-        }
-      ]
+      {
+        type: 'test',
+        foo: 123,
+        bar: 456,
+        labels: { qwe: 'asd' }
+      },
+      {
+        type: 'test',
+        foo: 124,
+        bar: 457,
+        labels: { qwe: 'zxc' }
+      }
     )
   end
 
@@ -50,20 +48,18 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
 
     it 'sends correct metrics' do
       expect { subject }.to send_metrics(
-        [
-          {
-            type: 'test',
-            foo: 123,
-            bar: 456,
-            labels: {}
-          },
-          {
-            type: 'test',
-            foo: 124,
-            bar: 457,
-            labels: {}
-          }
-        ]
+        {
+          type: 'test',
+          foo: 123,
+          bar: 456,
+          labels: {}
+        },
+        {
+          type: 'test',
+          foo: 124,
+          bar: 457,
+          labels: {}
+        }
       )
     end
   end
@@ -75,20 +71,18 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
 
     it 'sends correct metrics' do
       expect { subject }.to send_metrics(
-        [
-          {
-            type: 'test',
-            foo: 123,
-            bar: 456,
-            labels: { qwe: 'asd' }
-          },
-          {
-            type: 'test',
-            foo: 124,
-            bar: 457,
-            labels: { qwe: 'zxc' }
-          }
-        ]
+        {
+          type: 'test',
+          foo: 123,
+          bar: 456,
+          labels: { qwe: 'asd' }
+        },
+        {
+          type: 'test',
+          foo: 124,
+          bar: 457,
+          labels: { qwe: 'zxc' }
+        }
       )
     end
   end
@@ -99,20 +93,18 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
 
     it 'sends correct metrics' do
       expect { subject }.to send_metrics(
-        [
-          {
-            type: 'test',
-            foo: 123,
-            bar: 456,
-            labels: { qwe: 'asd', host: 'example.com' }
-          },
-          {
-            type: 'test',
-            foo: 124,
-            bar: 457,
-            labels: { qwe: 'zxc', host: 'example.com' }
-          }
-        ]
+        {
+          type: 'test',
+          foo: 123,
+          bar: 456,
+          labels: { qwe: 'asd', host: 'example.com' }
+        },
+        {
+          type: 'test',
+          foo: 124,
+          bar: 457,
+          labels: { qwe: 'zxc', host: 'example.com' }
+        }
       )
     end
   end

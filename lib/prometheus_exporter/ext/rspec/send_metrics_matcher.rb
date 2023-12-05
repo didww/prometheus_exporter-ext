@@ -78,9 +78,7 @@ module PrometheusExporter::Ext::RSpec
     private
 
     def deep_stringify_keys(hash)
-      hash.transform_keys(&:to_s).transform_values do |value|
-        value.is_a?(Hash) ? deep_stringify_keys(value) : value
-      end
+      JSON.parse JSON.generate(hash)
     end
   end
 end
