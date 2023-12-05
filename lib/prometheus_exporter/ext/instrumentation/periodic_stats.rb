@@ -21,7 +21,6 @@ module PrometheusExporter::Ext::Instrumentation
             rescue StandardError => e
               client.logger.error("#{klass} Prometheus Exporter Failed To Collect Stats")
               client.logger.error("#{e.class} #{e.backtrace&.join("\n")}")
-              @on_exception&.call(e) if defined?(@on_exception)
             ensure
               sleep frequency
             end
@@ -43,12 +42,6 @@ module PrometheusExporter::Ext::Instrumentation
           @thread.join
         end
         @thread = nil
-      end
-
-      # Adds handler that will be called when exception is raised in the thread.
-      # @yieldparam exception [Exception]
-      def on_exception(&block)
-        @on_exception = block
       end
     end
   end

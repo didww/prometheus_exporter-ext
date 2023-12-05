@@ -5,7 +5,10 @@ require 'prometheus_exporter/server'
 require 'prometheus_exporter/ext'
 require 'prometheus_exporter/ext/rspec'
 require 'prometheus_exporter/ext/instrumentation/base_stats'
+require 'prometheus_exporter/ext/instrumentation/periodic_stats'
 require 'prometheus_exporter/ext/server/stats_collector'
+require 'prometheus_exporter/ext/server/expired_stats_collector'
+require_relative 'support/rspec_test_helpers'
 
 RSpec::Support::ObjectFormatter.default_instance.max_formatted_output_length = nil
 
@@ -19,13 +22,38 @@ class TestInstrumentation < PrometheusExporter::Ext::Instrumentation::BaseStats
   end
 end
 
-class TestCollector < PrometheusExporter::Server::TypeCollector
+class PeriodicTestInstrumentation < PrometheusExporter::Ext::Instrumentation::PeriodicStats
+  self.type = 'test'
+  class << self
+    attr_accessor :test_counter
+  end
+
+  def collect
+    self.class.test_counter ||= 0
+    self.class.test_counter += 1
+    collect_data(keepalive: self.class.test_counter, labels: { foo: 'bar' })
+  end
+end
+
+class TestStatsCollector < PrometheusExporter::Server::TypeCollector
   include PrometheusExporter::Ext::Server::StatsCollector
   self.type = 'test'
 
-  register_metric :g_metric, :gauge, 'test gauge metric'
-  register_metric :gwt_metric, :gauge_with_time, 'test gauge with time metric'
-  register_metric :c_metric, :counter, 'test counter metric'
+  register_gauge :g_metric, 'test gauge metric'
+  register_counter :c_metric, 'test counter metric'
+end
+
+class TestExpiredCollector < PrometheusExporter::Server::TypeCollector
+  include PrometheusExporter::Ext::Server::ExpiredStatsCollector
+  self.type = 'test'
+  self.ttl = 2
+
+  unique_metric_by do |new_metric, metric|
+    metric['labels'] == new_metric['labels']
+  end
+
+  register_gauge :g_metric, 'test gauge metric'
+  register_counter :c_metric, 'test counter metric'
 end
 
 RSpec.configure do |config|
@@ -38,4 +66,6 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  config.include RSpecTestHelpers
 end
