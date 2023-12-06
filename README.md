@@ -68,14 +68,40 @@ module Prometheus
     include ::PrometheusExporter::Ext::Server::StatsCollector
     self.type = 'my'
 
-    # The :gauge_with_time will allow you to write timestamp to gauge metric when value were observer.
-    # It will replace data with same labels and recalculate timestamp.
-    register_metric :last_duration_seconds, :gauge_with_time, 'duration of last operation execution'
-    register_metric :task_duration_seconds_sum, :counter, 'sum of operation execution durations'
-    register_metric :task_duration_seconds_count, :counter, 'sum of operation execution runs'
+    # The `register_gauge_with_expire` will remove or zero expired metric.
+    # when no :strategy option passed, default is `:removing`, available options are `:removing, :zeroing`.
+    # when no :ttl option passed, default is 60, any numeric greater than 0 can be used.
+    register_gauge_with_expire :last_duration_seconds, 'duration of last operation execution', ttl: 300
+    
+    register_counter :task_duration_seconds_sum, 'sum of operation execution durations'
+    register_counter :task_duration_seconds_count, 'sum of operation execution runs'
   end
 end
 ```
+
+as alternative you can use `ExpiredStatsCollector` if you want all metric data to be removed after expiration
+```ruby
+require 'prometheus_exporter/ext'
+require 'prometheus_exporter/ext/server/stats_collector'
+
+module Prometheus
+  class MyCollector < ::PrometheusExporter::Server::TypeCollector
+    include ::PrometheusExporter::Ext::Server::ExpiredStatsCollector
+    self.type = 'my'
+    self.ttl = 300 # default 60
+    
+    # Optionally you can expire old_metric when specific new metric is collected.
+    # If this block returns true then old_metric will be removed.
+    unique_metric_by do |new_metric, old_metric|
+      new_metric['labels'] == old_metric['labels']
+    end
+
+    register_gauge :last_duration_seconds, 'duration of last operation execution'
+    register_counter :task_duration_seconds_sum, 'sum of operation execution durations'
+    register_counter :task_duration_seconds_count, 'sum of operation execution runs'
+  end
+end
+````
 
 ### When metrics should be send periodically with given frequency
 create instrumentation
@@ -126,14 +152,31 @@ module Prometheus
   class MyCollector < ::PrometheusExporter::Server::TypeCollector
     include ::PrometheusExporter::Ext::Server::StatsCollector
     self.type = 'my'
-
-    # The :gauge_with_time will allow you to write timestamp to gauge metric when value were observer.
-    # It will replace data with same labels and recalculate timestamp.
-    register_metric :last_processed_duration, :gauge_with_time, 'duration of last processed record'
+    
+    # Default ttl 60, default strategy `:removing`.
+    register_gauge_with_expire :last_processed_duration, 'duration of last processed record'
     register_metric :processed_count, :gauge_with_time, 'count of processed records'
   end
 end
 ```
+
+as alternative you can use `ExpiredStatsCollector` if you want all metric data to be removed after expiration
+```ruby
+require 'prometheus_exporter/ext'
+require 'prometheus_exporter/ext/server/stats_collector'
+
+module Prometheus
+  class MyCollector < ::PrometheusExporter::Server::TypeCollector
+    include ::PrometheusExporter::Ext::Server::ExpiredStatsCollector
+    self.type = 'my'
+    # By default ttl is 60
+    # By default deletes old metrics only when it's expired
+
+    register_gauge :last_processed_duration, 'duration of last processed record'
+    register_metric :processed_count, :gauge_with_time, 'count of processed records'
+  end
+end
+````
 
 ### You also can easily test your instrumentations and collectors using new matchers
 
@@ -168,7 +211,7 @@ collector test
 RSpec.describe Prometheus::MyCollector do
   describe '#collect' do
     subject do
-      collector.collect(metric.deep_stringify_keys)
+      collector.metrics
     end
 
     let(:collector) { described_class.new }
@@ -178,18 +221,38 @@ RSpec.describe Prometheus::MyCollector do
         metric_labels: {},
         labels: { operation_name: 'test' },
         last_duration_seconds: 1.2,
-        duration_seconds_sum: 3,4,
+        duration_seconds_sum: 3.4,
         duration_seconds_count: 1
       }
+    end
+    
+    let(:collect_data) do
+      collector.collect(metric.deep_stringify_keys)
     end
 
     it 'observes prometheus metrics' do
       subject
       expect(collector.metrics).to contain_exactly(
-        a_gauge_with_time_metric('my_last_duration_seconds').with([1.2, ms_since_epoch], metric[:labels]),
+        a_gauge_with_expire_metric('my_last_duration_seconds').with(1.2, metric[:labels]),
         a_counter_metric('my_duration_seconds_sum').with(3.4, metric[:labels]),
         a_counter_metric('my_duration_seconds_count').with(1, metric[:labels])
       )
+    end
+    
+    context 'when collected data is expired' do
+      let(:collect_data) do
+        super()
+        sleep 60.1 # when gauge_with_expire ttl is 60
+      end
+
+      it 'observes empty prometheus metrics' do
+        subject
+        expect(collector.metrics).to contain_exactly(
+          a_gauge_with_expire_metric('my_last_duration_seconds').empty,
+          a_counter_metric('my_duration_seconds_sum').with(3.4, metric[:labels]),
+          a_counter_metric('my_duration_seconds_count').with(1, metric[:labels])
+        )
+      end
     end
   end
 end

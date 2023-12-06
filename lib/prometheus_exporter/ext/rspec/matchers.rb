@@ -19,6 +19,10 @@ module PrometheusExporter::Ext::RSpec
       a_prometheus_metric(PrometheusExporter::Metric::Gauge, name)
     end
 
+    def a_gauge_with_expire_metric(name)
+      a_prometheus_metric(PrometheusExporter::Ext::Metric::GaugeWithExpire, name)
+    end
+
     def a_counter_metric(name)
       a_prometheus_metric(PrometheusExporter::Metric::Counter, name)
     end

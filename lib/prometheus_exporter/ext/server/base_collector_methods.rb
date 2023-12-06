@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/metric'
+require_relative '../metric/gauge_with_expire'
 
 module PrometheusExporter::Ext::Server
   module BaseCollectorMethods

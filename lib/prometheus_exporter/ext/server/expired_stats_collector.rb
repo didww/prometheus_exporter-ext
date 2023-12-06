@@ -21,7 +21,7 @@ module PrometheusExporter::Ext::Server
       # Defines a rule how old metric will be replaced with new one.
       # @yield compare new metric with existing one.
       # @yieldparam new_metric [Hash] new metric data.
-      # @yieldparam metric [Hash] existing metric data.
+      # @yieldparam old_metric [Hash] existing metric data.
       # @yieldreturn [Boolean] if true existing metric will be replaced with new one.
       def unique_metric_by(&block)
         @filter = block
