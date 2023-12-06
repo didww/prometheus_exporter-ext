@@ -33,8 +33,8 @@ module PrometheusExporter::Ext::RSpec
       if expected
         expected_value = @ordered ? expected : match_array(expected)
         values_match?(expected_value, actual)
-      elsif @times
-        values_match?(@times, actual.size)
+      elsif @qty
+        values_match?(@qty, actual.size)
       else
         actual.size >= 1
       end

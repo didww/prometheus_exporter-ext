@@ -40,6 +40,8 @@ class TestStatsCollector < PrometheusExporter::Server::TypeCollector
   self.type = 'test'
 
   register_gauge :g_metric, 'test gauge metric'
+  register_gauge_with_expire :gwen_metric, 'test gauge with expire nullify metric', ttl: 2
+  register_gauge_with_expire :gwez_metric, 'test gauge with expire zeroing metric', ttl: 3, strategy: :zeroing
   register_counter :c_metric, 'test counter metric'
 end
 
@@ -48,8 +50,8 @@ class TestExpiredCollector < PrometheusExporter::Server::TypeCollector
   self.type = 'test'
   self.ttl = 2
 
-  unique_metric_by do |new_metric, metric|
-    metric['labels'] == new_metric['labels']
+  unique_metric_by do |new_metric, old_metric|
+    old_metric['labels'] == new_metric['labels']
   end
 
   register_gauge :g_metric, 'test gauge metric'

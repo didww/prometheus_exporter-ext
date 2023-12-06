@@ -10,6 +10,17 @@ module PrometheusExporter::Ext::Server
       def included(klass)
         super
         klass.include BaseCollectorMethods
+        klass.extend ClassMethods
+      end
+    end
+
+    module ClassMethods
+      # Registers PrometheusExporter::Metric::GaugeWithExpire observer.
+      # @param name [Symbol] metric name.
+      # @param help [String] metric description.
+      # @param opts [Hash] additional options, supports `ttl` and `strategy` keys.
+      def register_gauge_with_expire(name, help, opts = {})
+        register_metric(name, help, PrometheusExporter::Ext::Metric::GaugeWithExpire, opts)
       end
     end
 

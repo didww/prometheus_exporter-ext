@@ -40,6 +40,11 @@ module PrometheusExporter::Ext::RSpec
       self
     end
 
+    def empty
+      @metric_payload = {}
+      self
+    end
+
     def description_of(object)
       RSpec::Support::ObjectFormatter.new(nil).format(object)
     end
