@@ -2,7 +2,9 @@
 
 ![Tests](https://github.com/didww/prometheus_exporter-ext/workflows/Tests/badge.svg)
 
-Extended Prometheus Exporter for Ruby
+Extension for [Ruby Prometheus Exporter](https://github.com/discourse/prometheus_exporter).
+Adds DSL for building your custom Prometheus instrumentations and collectors.
+Allow to remove/zero expired gauge metrics in a collector.
 
 ## Installation
 
