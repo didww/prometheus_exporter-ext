@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/metric'
+require_relative '../../ext'
 
 module PrometheusExporter::Ext::Metric
   class GaugeWithExpire < PrometheusExporter::Metric::Gauge

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/client'
+require_relative '../../ext'
 
 module PrometheusExporter::Ext::Instrumentation
   class BaseStats

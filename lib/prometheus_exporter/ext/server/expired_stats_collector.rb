@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative 'base_collector_methods'
 require 'prometheus_exporter/server/metrics_container'
+require_relative 'base_collector_methods'
 
 module PrometheusExporter::Ext::Server
   module ExpiredStatsCollector

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus_exporter/server/web_server'
+require_relative '../../ext'
 
 module PrometheusExporter::Ext::Server
   class SingletonWebServer < PrometheusExporter::Server::WebServer
