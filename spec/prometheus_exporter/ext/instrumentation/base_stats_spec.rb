@@ -21,6 +21,23 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
     expect { subject }.to send_metrics.times(2)
   end
 
+  it 'sends matchers matched nested matchers' do
+    expect { subject }.to send_metrics(
+      {
+        type: 'test',
+        foo: a_kind_of(Integer),
+        bar: 456,
+        labels: { qwe: 'asd' }
+      },
+      {
+        type: 'test',
+        foo: 124,
+        bar: 457,
+        labels: hash_including(qwe: 'zxc')
+      }
+    )
+  end
+
   it 'sends correct metrics' do
     expect { subject }.to send_metrics(
       {

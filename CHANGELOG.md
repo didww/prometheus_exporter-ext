@@ -1,4 +1,5 @@
 ## [Unreleased]
+- fix send_metrics RSpec matcher
 
 ## [0.2.1] - 2023-12-06
 - add gauge_with_expire, add tests, update readme

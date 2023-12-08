@@ -8,8 +8,9 @@ module PrometheusExporter::Ext::RSpec
 
     attr_reader :expected, :actual
 
+    # @param expected [Array<Hash(Symbol)>,nil]
     def initialize(expected)
-      @expected = expected&.map { |metric| deep_stringify_keys(metric) }
+      @expected = expected
       @ordered = false
       @times = nil
     end
@@ -28,13 +29,13 @@ module PrometheusExporter::Ext::RSpec
       metrics_before = PrometheusExporter::Ext::RSpec::TestClient.instance.metrics
       actual_proc.call
       metrics_after = PrometheusExporter::Ext::RSpec::TestClient.instance.metrics - metrics_before
-      @actual = metrics_after.map { |metric| deep_stringify_keys(metric) }
+      @actual = metrics_after.map { |metric| deep_symbolize_keys(metric) }
 
       if expected
         expected_value = @ordered ? expected : match_array(expected)
         values_match?(expected_value, actual)
-      elsif @qty
-        values_match?(@qty, actual.size)
+      elsif @times
+        values_match?(@times, actual.size)
       else
         actual.size >= 1
       end
@@ -77,8 +78,12 @@ module PrometheusExporter::Ext::RSpec
 
     private
 
-    def deep_stringify_keys(hash)
-      JSON.parse JSON.generate(hash)
+    def deep_symbolize_keys(hash)
+      new_hash = {}
+      hash.each do |k, v|
+        new_hash[k.to_sym] = v.is_a?(Hash) ? deep_symbolize_keys(v) : v
+      end
+      new_hash
     end
   end
 end
