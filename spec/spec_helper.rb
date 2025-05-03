@@ -8,6 +8,7 @@ require 'prometheus_exporter/ext/instrumentation/base_stats'
 require 'prometheus_exporter/ext/instrumentation/periodic_stats'
 require 'prometheus_exporter/ext/instrumentation/proc_stat'
 require 'prometheus_exporter/ext/server/stats_collector'
+require 'prometheus_exporter/ext/server/proc_stat_collector'
 require 'prometheus_exporter/ext/server/expired_stats_collector'
 require_relative 'support/rspec_test_helpers'
 
