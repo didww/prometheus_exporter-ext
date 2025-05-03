@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [0.2.4] - 2024-05-03
 - add PrometheusExporter::Ext::Server::ProcStatCollector [#8](https://github.com/didww/prometheus_exporter-ext/pull/8)
 
 ## [0.2.3] - 2024-05-03
