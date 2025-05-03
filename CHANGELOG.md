@@ -1,4 +1,5 @@
 ## [Unreleased]
+- add PrometheusExporter::Ext::Instrumentation::ProcStat [#7](https://github.com/didww/prometheus_exporter-ext/pull/7)
 
 ## [0.2.2] - 2023-12-08
 - fix send_metrics RSpec matcher
