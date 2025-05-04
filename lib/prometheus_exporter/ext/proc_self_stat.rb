@@ -4,6 +4,7 @@ module PrometheusExporter::Ext
   # https://man7.org/linux/man-pages/man5/proc_pid_stat.5.html
   class ProcSelfStat
     KERNEL_PAGE_SIZE = `getconf PAGESIZE`.chomp.to_i rescue 4096 # rubocop:disable Style/RescueModifier
+    TICKS_PER_SEC = Etc.sysconf(Etc::SC_CLK_TCK)
 
     class << self
       def get
@@ -37,20 +38,12 @@ module PrometheusExporter::Ext
 
     # @return [Float]
     def cpu_time
-      ticks_per_sec = Etc.sysconf(Etc::SC_CLK_TCK)
-      (utime + stime).to_f / ticks_per_sec
+      (utime + stime).to_f / TICKS_PER_SEC
     end
 
     # @return [Integer]
     def rss_bytes
       rss * KERNEL_PAGE_SIZE
-    end
-
-    # @return [Float]
-    def uptime_seconds
-      uptime_seconds = File.read('/proc/uptime').split[0].to_f
-      ticks_per_sec = Etc.sysconf(Etc::SC_CLK_TCK)
-      uptime_seconds - (starttime.to_f / ticks_per_sec)
     end
 
     def to_a

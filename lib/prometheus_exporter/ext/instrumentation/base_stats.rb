@@ -9,8 +9,8 @@ module PrometheusExporter::Ext::Instrumentation
       attr_accessor :type
     end
 
-    def initialize(client: PrometheusExporter::Client.default, metric_labels: {})
-      @metric_labels = metric_labels.transform_keys(&:to_sym)
+    def initialize(client: PrometheusExporter::Client.default, labels: {})
+      @labels = labels.transform_keys(&:to_sym)
       @client = client
     end
 
@@ -38,7 +38,7 @@ module PrometheusExporter::Ext::Instrumentation
       metric[:type] = type
       metric[:labels] ||= {}
       metric[:labels].transform_keys!(&:to_sym)
-      metric[:labels].merge!(@metric_labels)
+      metric[:labels].merge!(@labels)
       metric
     end
   end
