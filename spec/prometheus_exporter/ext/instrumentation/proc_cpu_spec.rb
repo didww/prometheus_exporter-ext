@@ -11,6 +11,9 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ProcCpu do
     let(:frequency) { 2 }
     # because thread requires few milliseconds to start
     let(:wait_seconds) { 0.1 }
+    let(:expected_labels) do
+      { type:, pid: Process.pid.to_s, hostname: PrometheusExporter.hostname }
+    end
 
     after do
       described_class.stop
@@ -21,7 +24,7 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ProcCpu do
         {
           usage_seconds_total: an_instance_of(Float),
           type: 'proc_cpu',
-          labels: { type:, pid: Process.pid.to_s }
+          labels: expected_labels
         }
       )
     end
@@ -34,12 +37,12 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ProcCpu do
           {
             usage_seconds_total: an_instance_of(Float),
             type: 'proc_cpu',
-            labels: { type:, pid: Process.pid.to_s }
+            labels: expected_labels
           },
           {
             usage_seconds_total: an_instance_of(Float),
             type: 'proc_cpu',
-            labels: { type:, pid: Process.pid.to_s }
+            labels: expected_labels
           }
         )
       end
@@ -53,12 +56,12 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ProcCpu do
           {
             usage_seconds_total: an_instance_of(Float),
             type: 'proc_cpu',
-            labels: { type:, pid: Process.pid.to_s }
+            labels: expected_labels
           },
           {
             usage_seconds_total: an_instance_of(Float),
             type: 'proc_cpu',
-            labels: { type:, pid: Process.pid.to_s }
+            labels: expected_labels
           }
         )
       end
