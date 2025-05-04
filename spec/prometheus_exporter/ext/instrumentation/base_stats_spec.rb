@@ -104,9 +104,9 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
     end
   end
 
-  context 'when instrumentation has metric_labels' do
-    let(:instrumentation) { TestInstrumentation.new(metric_labels:) }
-    let(:metric_labels) { { host: 'example.com' } }
+  context 'when instrumentation has custom labels' do
+    let(:instrumentation) { TestInstrumentation.new(labels:) }
+    let(:labels) { { host: 'example.com' } }
 
     it 'sends correct metrics' do
       expect { subject }.to send_metrics(

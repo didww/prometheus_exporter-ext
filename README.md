@@ -55,7 +55,7 @@ ensure
   ## you can add additional labels or override client
   Prometheus::MyInstrumentation.new(
     client: PrometheusExporter::Client.new(...),
-    metric_labels: { foo: 'bar' }
+    labels: { foo: 'bar' }
   ).collect(duration)
 end
 ```
@@ -140,7 +140,7 @@ Prometheus::MyInstrumentation.start(frequency: 60)
 ## also you can add additional labels or override client
 Prometheus::MyInstrumentation.start(
   client: PrometheusExporter::Client.new(...),
-  metric_labels: { foo: 'bar' }
+  labels: { foo: 'bar' }
 )
 # to stop instrumentation call `Prometheus::MyInstrumentation.stop`
 ```
@@ -196,7 +196,6 @@ RSpec.describe Prometheus::MyInstrumentation do
       expect { subject }.to send_metrics(
         [
           type: 'my',
-          metric_labels: {},
           labels: { operation_name: operation },
           last_duration_seconds: duration,
           duration_seconds_sum: duration,
@@ -220,7 +219,6 @@ RSpec.describe Prometheus::MyCollector do
     let(:metric) do
       {
         type: 'my',
-        metric_labels: {},
         labels: { operation_name: 'test' },
         last_duration_seconds: 1.2,
         duration_seconds_sum: 3.4,
