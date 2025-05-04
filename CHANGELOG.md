@@ -1,10 +1,13 @@
 ## [Unreleased]
 
+## [0.3.0] - 2024-05-04
+- replace ProcStat with ProcCpu
+
 ## [0.2.4] - 2024-05-03
-- add PrometheusExporter::Ext::Server::ProcStatCollector [#8](https://github.com/didww/prometheus_exporter-ext/pull/8)
+- add PrometheusExporter::Ext::Server::ProcStatCollector
 
 ## [0.2.3] - 2024-05-03
-- add PrometheusExporter::Ext::Instrumentation::ProcStat [#7](https://github.com/didww/prometheus_exporter-ext/pull/7)
+- add PrometheusExporter::Ext::Instrumentation::ProcStat
 
 ## [0.2.2] - 2023-12-08
 - fix send_metrics RSpec matcher
