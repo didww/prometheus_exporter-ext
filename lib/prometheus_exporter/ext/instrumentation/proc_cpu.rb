@@ -23,7 +23,10 @@ module PrometheusExporter::Ext::Instrumentation
     def collect
       stat = PrometheusExporter::Ext::ProcSelfStat.get
       collect_data(
-        labels: { pid: stat.pid },
+        labels: {
+          pid: stat.pid,
+          hostname: ::PrometheusExporter.hostname
+        },
         usage_seconds_total: stat.cpu_time - @last_cpu_time
       )
       @last_cpu_time = stat.cpu_time

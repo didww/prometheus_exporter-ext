@@ -9,7 +9,7 @@ RSpec.describe PrometheusExporter::Ext::Server::ProcCpuCollector do
   let(:collector) { described_class.new }
   let(:metric) do
     {
-      labels: { pid: '1234', type: 'test' },
+      labels: { pid: '1234', type: 'test', hostname: 'rspec' },
       usage_seconds_total: 0.123
     }
   end
