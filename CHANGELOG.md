@@ -1,4 +1,5 @@
 ## [Unreleased]
+- drop EOL Ruby 3.2, test on Ruby 3.3 and 3.4, raise `required_ruby_version` to `>= 3.3.0`
 
 ## [0.3.2] - 2026-06-11
 - fix gemspec missing `spec.files` so the published gem actually ships its source files (0.3.1 and earlier shipped empty)
