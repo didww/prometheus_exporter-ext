@@ -35,7 +35,7 @@ few features the base gem doesn't provide:
 
 ## Installation
 
-Requires Ruby `>= 3.2.0` and `prometheus_exporter ~> 2.0`.
+Requires Ruby `>= 3.3.0` and `prometheus_exporter ~> 2.0`.
 
 Add the gem to your application's Gemfile by executing:
 
