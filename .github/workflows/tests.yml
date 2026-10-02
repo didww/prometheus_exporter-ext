@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Ruby 4.0 is blocked: prometheus_exporter 2.3.1 requires 'logger', which is no longer a default gem in Ruby 4.0.
         ruby:
-          - '3.2'
           - '3.3'
           - '3.4'
 
