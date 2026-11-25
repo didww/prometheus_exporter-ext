@@ -301,11 +301,6 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
           },
           {
             type: 'active_job',
-            labels: { job_class: 'TestJob', adapter: test_adapter, queue: 'default', scheduled: 'true' },
-            enqueued_total: 1
-          },
-          {
-            type: 'active_job',
             labels: {
               job_class: 'TestJob', adapter: test_adapter,
               executions: '1',
@@ -465,15 +460,6 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
 
       it 'sends retried_total without an error label' do
         expect { subject }.to send_metrics(
-          {
-            type: 'active_job',
-            labels: {
-              job_class: 'RetryWithoutErrorTestJob', adapter: test_adapter,
-              queue: 'default',
-              scheduled: 'true'
-            },
-            enqueued_total: 1
-          },
           {
             type: 'active_job',
             labels: { job_class: 'RetryWithoutErrorTestJob', adapter: test_adapter, executions: '1', queue: 'default' },

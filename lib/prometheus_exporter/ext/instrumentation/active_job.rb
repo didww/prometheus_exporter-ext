@@ -115,6 +115,9 @@ module PrometheusExporter::Ext::Instrumentation
       safe_collect do
         jobs.each do |job|
           if all_enqueued || job.successfully_enqueued?
+            # A retry re-enqueues a job that already ran; retried_total counts it.
+            next if job.executions.to_i.positive?
+
             collect_data(
               {
                 labels: job_labels(job, adapter, scheduled: job.scheduled_at.present? ? 'true' : nil),

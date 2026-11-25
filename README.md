@@ -309,6 +309,7 @@ This exposes these counters, labeled with `job_class`, `adapter`, `queue`, and, 
 `active_job_success_total`, `active_job_failed_total`, `active_job_retried_total`,
 `active_job_retry_stopped_total`, `active_job_discarded_total`, `active_job_duration_seconds`, and
 `active_job_latency_seconds`. Latency of a scheduled job counts from its `scheduled_at`, not from enqueue time.
+`active_job_enqueued_total` counts first enqueues only; a retry's re-enqueue counts in `active_job_retried_total`.
 
 ### Solid Queue metrics
 
