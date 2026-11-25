@@ -15,10 +15,19 @@ module PrometheusExporter::Ext::Server
 
     private
 
+    EXPIRING_METRIC_CLASSES = [
+      PrometheusExporter::Ext::Metric::CounterWithExpire,
+      PrometheusExporter::Ext::Metric::GaugeWithExpire
+    ].freeze
+    private_constant :EXPIRING_METRIC_CLASSES
+
     def build_observers
       self.class.registered_metrics.to_h do |name, metric|
-        opts = (metric[:args].first || {}).merge(ttl: self.class.ttl)
-        [name, metric[:metric_class].new("#{type}_#{name}", metric[:help], opts)]
+        args = metric[:args]
+        if EXPIRING_METRIC_CLASSES.include?(metric[:metric_class])
+          args = [(args.first || {}).merge(ttl: self.class.ttl)]
+        end
+        [name, metric[:metric_class].new("#{type}_#{name}", metric[:help], *args)]
       end
     end
   end

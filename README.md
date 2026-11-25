@@ -340,7 +340,9 @@ Rails.application.middleware.unshift PrometheusExporter::Ext::RequestMiddleware,
 ```
 
 It accepts the same options as `PrometheusExporter::Middleware` (`instrument:`, `client:`).
-When you omit `instrument:`, it stays `:alias_method`, as in the parent class.
+When you omit `instrument:`, it defaults to `:alias_method` even if you pass other keys.
+The parent class applies that default only when you pass no config at all, so
+`client:` alone turns instrumentation off there but not here. To turn it off, pass `instrument: nil`.
 
 ### Singleton web server
 

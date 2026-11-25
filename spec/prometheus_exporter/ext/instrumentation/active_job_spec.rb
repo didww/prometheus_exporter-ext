@@ -125,6 +125,50 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
         }
       )
     end
+
+    context 'when the adapter enqueues in bulk without setting successfully_enqueued' do
+      let(:adapter_class) do
+        Class.new do
+          def enqueue_all(jobs)
+            jobs.size
+          end
+
+          def enqueue(_job)
+            nil
+          end
+
+          def enqueue_at(_job, _timestamp)
+            nil
+          end
+        end
+      end
+
+      let!(:original_adapter) { TestJob.queue_adapter }
+
+      before do
+        stub_const('BulkWithoutFlagsAdapter', adapter_class)
+        TestJob.queue_adapter = BulkWithoutFlagsAdapter.new
+      end
+
+      after do
+        TestJob.queue_adapter = original_adapter
+      end
+
+      it 'counts the jobs as enqueued using the enqueued_count payload' do
+        expect { subject }.to send_metrics(
+          {
+            type: 'active_job',
+            labels: { job_class: 'TestJob', adapter: 'BulkWithoutFlagsAdapter', queue: 'default' },
+            enqueued_total: 1
+          },
+          {
+            type: 'active_job',
+            labels: { job_class: 'TestJob', adapter: 'BulkWithoutFlagsAdapter', queue: 'default', scheduled: 'true' },
+            enqueued_total: 1
+          }
+        )
+      end
+    end
   end
 
   describe 'perform job' do
@@ -392,6 +436,105 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
               error: 'RuntimeError'
             },
             failed_total: 1
+          }
+        )
+      end
+    end
+
+    context 'when a before_perform callback aborts the job' do
+      subject do
+        AbortedTestJob.perform_now
+      end
+
+      it 'does not count the job as successful' do
+        expect { subject }.to send_metrics(
+          {
+            type: 'active_job',
+            labels: { job_class: 'AbortedTestJob', adapter: test_adapter, executions: '1', queue: 'default' },
+            executed_total: 1,
+            duration_seconds: be >= 0
+          }
+        )
+      end
+    end
+
+    context 'when job retries without an error' do
+      subject do
+        RetryWithoutErrorTestJob.perform_now(error: RetryWithoutErrorTestJob::RetryWithoutErrorError)
+      end
+
+      it 'sends retried_total without an error label' do
+        expect { subject }.to send_metrics(
+          {
+            type: 'active_job',
+            labels: {
+              job_class: 'RetryWithoutErrorTestJob', adapter: test_adapter,
+              queue: 'default',
+              scheduled: 'true'
+            },
+            enqueued_total: 1
+          },
+          {
+            type: 'active_job',
+            labels: { job_class: 'RetryWithoutErrorTestJob', adapter: test_adapter, executions: '1', queue: 'default' },
+            retried_total: 1
+          },
+          {
+            type: 'active_job',
+            labels: { job_class: 'RetryWithoutErrorTestJob', adapter: test_adapter, executions: '1', queue: 'default' },
+            executed_total: 1,
+            success_total: 1,
+            duration_seconds: be_positive
+          }
+        )
+      end
+    end
+  end
+
+  describe 'collecting directly' do
+    let(:instrumentation) { described_class.new }
+    let(:adapter) { ActiveJob::Base.queue_adapter }
+    let(:job) { TestJob.new }
+
+    describe '#collect_enqueue_retried' do
+      subject do
+        instrumentation.collect_enqueue_retried(job:, adapter:, error: StandardError.new)
+      end
+
+      it 'does not count a retry whose re-enqueue failed' do
+        job.successfully_enqueued = false
+        expect { subject }.not_to send_metrics
+      end
+
+      it 'counts a retry whose re-enqueue succeeded' do
+        job.successfully_enqueued = true
+        expect { subject }.to send_metrics(
+          {
+            type: 'active_job',
+            labels: {
+              job_class: 'TestJob', adapter: test_adapter,
+              executions: '0',
+              queue: 'default',
+              error: 'StandardError'
+            },
+            retried_total: 1
+          }
+        )
+      end
+    end
+
+    describe '#collect_performed' do
+      it 'keeps the queue the job started on when retry_on changed it' do
+        instrumentation.collect_started(job:, adapter:)
+        job.queue_name = 'low'
+
+        expect { instrumentation.collect_performed(job:, adapter:, exception: nil, duration_ms: 1) }.to send_metrics(
+          {
+            type: 'active_job',
+            labels: { job_class: 'TestJob', adapter: test_adapter, executions: '0', queue: 'default' },
+            executed_total: 1,
+            success_total: 1,
+            duration_seconds: be_positive
           }
         )
       end

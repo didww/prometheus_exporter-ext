@@ -29,3 +29,13 @@ class TestJob < ActiveJob::Base
     raise error unless error.nil?
   end
 end
+
+class AbortedTestJob < TestJob
+  before_perform { throw :abort }
+end
+
+class RetryWithoutErrorTestJob < TestJob
+  RetryWithoutErrorError = Class.new(StandardError)
+
+  rescue_from(RetryWithoutErrorError) { |_error| retry_job(wait: 1.second) }
+end

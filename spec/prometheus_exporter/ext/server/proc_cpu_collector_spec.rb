@@ -75,4 +75,17 @@ RSpec.describe PrometheusExporter::Ext::Server::ProcCpuCollector do
       expect(collector.metrics.first.ttl).to eq(10)
     end
   end
+
+  context 'when a plain metric is registered on the collector' do
+    before { described_class.register_gauge :extra_metric, 'extra gauge' }
+
+    after { described_class.registered_metrics.delete('extra_metric') }
+
+    it 'builds it without the ttl option' do
+      expect(collector.metrics).to contain_exactly(
+        a_counter_with_expire_metric('proc_cpu_usage_seconds_total').empty,
+        a_gauge_metric('proc_cpu_extra_metric').empty
+      )
+    end
+  end
 end

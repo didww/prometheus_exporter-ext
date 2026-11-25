@@ -12,6 +12,8 @@ module PrometheusExporter::Ext::Instrumentation
   class ActiveJob < BaseStats
     self.type = 'active_job'
 
+    QUEUE_IVAR = :@_prometheus_exporter_queue
+
     class << self
       # @see https://guides.rubyonrails.org/active_support_instrumentation.html#active-job
       def subscribe(**)
@@ -59,7 +61,8 @@ module PrometheusExporter::Ext::Instrumentation
           instance.collect_enqueued(
             jobs: event.payload[:jobs],
             adapter: event.payload[:adapter],
-            exception_object: event.payload[:exception_object]
+            exception_object: event.payload[:exception_object],
+            enqueued_count: event.payload[:enqueued_count]
           )
         end
       end
@@ -79,7 +82,8 @@ module PrometheusExporter::Ext::Instrumentation
             job: event.payload[:job],
             adapter: event.payload[:adapter],
             exception: event.payload[:exception],
-            duration_ms: event.duration
+            duration_ms: event.duration,
+            aborted: event.payload[:aborted]
           )
         end
       end
@@ -126,10 +130,14 @@ module PrometheusExporter::Ext::Instrumentation
       end
     end
 
-    def collect_enqueued(jobs:, adapter:, exception_object: nil)
+    def collect_enqueued(jobs:, adapter:, exception_object: nil, enqueued_count: nil)
+      # Adapters implementing enqueue_all (e.g. Sidekiq) may not set successfully_enqueued on each job,
+      # so Rails' LogSubscriber#enqueue_all trusts the enqueued_count payload instead.
+      all_enqueued = !enqueued_count.nil? && enqueued_count.to_i == jobs.size
+
       safe_collect do
         jobs.each do |job|
-          if job.successfully_enqueued?
+          if all_enqueued || job.successfully_enqueued?
             collect_data(
               {
                 labels: job_labels(job, adapter, scheduled: job.scheduled_at.present? ? 'true' : nil),
@@ -151,6 +159,7 @@ module PrometheusExporter::Ext::Instrumentation
 
     def collect_started(job:, adapter:, now: Time.current)
       safe_collect do
+        job.instance_variable_set(QUEUE_IVAR, job.queue_name.to_s)
         latency_seconds = calculate_latency(job.enqueued_at, job.scheduled_at, now)
         if latency_seconds.present?
           collect_data(
@@ -163,13 +172,16 @@ module PrometheusExporter::Ext::Instrumentation
       end
     end
 
-    def collect_performed(job:, adapter:, exception:, duration_ms:)
+    def collect_performed(job:, adapter:, exception:, duration_ms:, aborted: false)
       safe_collect do
+        # Rails < 8.1 retry_on(queue:) changes job.queue_name before perform.active_job is published.
+        queue = job.instance_variable_get(QUEUE_IVAR) || job.queue_name.to_s
+        success = exception.blank? && !aborted
         collect_data(
           {
-            labels: job_labels(job, adapter, executions: job.executions.to_s),
+            labels: job_labels(job, adapter, queue:, executions: job.executions.to_s),
             executed_total: 1,
-            success_total: exception.present? ? nil : 1,
+            success_total: success ? 1 : nil,
             duration_seconds: ms2s(duration_ms)
           }.compact
         )
@@ -177,7 +189,7 @@ module PrometheusExporter::Ext::Instrumentation
         if exception.present?
           collect_data(
             {
-              labels: job_labels(job, adapter, executions: job.executions.to_s, error: exception.first.to_s),
+              labels: job_labels(job, adapter, queue:, executions: job.executions.to_s, error: exception.first.to_s),
               failed_total: 1
             }
           )
@@ -187,9 +199,12 @@ module PrometheusExporter::Ext::Instrumentation
 
     def collect_enqueue_retried(job:, adapter:, error:)
       safe_collect do
+        # Rails publishes enqueue_retry.active_job even when the re-enqueue failed.
+        next unless job.successfully_enqueued?
+
         collect_data(
           {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
             retried_total: 1
           }
         )
@@ -200,7 +215,7 @@ module PrometheusExporter::Ext::Instrumentation
       safe_collect do
         collect_data(
           {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
             discarded_total: 1
           }
         )
@@ -211,7 +226,7 @@ module PrometheusExporter::Ext::Instrumentation
       safe_collect do
         collect_data(
           {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
             retry_stopped_total: 1
           }
         )
@@ -220,11 +235,11 @@ module PrometheusExporter::Ext::Instrumentation
 
     private
 
-    def job_labels(job, adapter, **extra)
+    def job_labels(job, adapter, queue: job.queue_name.to_s, **extra)
       {
         job_class: job.class.to_s,
         adapter: adapter.class.name,
-        queue: job.queue_name.to_s,
+        queue:,
         **extra
       }.compact_blank
     end
