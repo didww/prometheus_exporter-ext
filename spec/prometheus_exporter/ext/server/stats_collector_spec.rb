@@ -239,4 +239,40 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
       expect(observer.to_h).to eq({ 'qwe' => 'asd' } => 3.5)
     end
   end
+
+  describe '.ttl' do
+    let(:collector_class) do
+      Class.new(PrometheusExporter::Server::TypeCollector) do
+        include PrometheusExporter::Ext::Server::StatsCollector
+
+        self.type = 'ttl'
+        self.ttl = 120
+        register_gauge_with_expire :gauge, 'help'
+        register_counter_with_expire :counter, 'help'
+        register_gauge_with_expire :own_ttl_gauge, 'help', ttl: 5
+        register_gauge :plain_gauge, 'help'
+      end
+    end
+    let(:observers) { collector_class.new.metrics.to_h { |metric| [metric.name, metric] } }
+
+    it 'applies to expiring metrics registered without ttl' do
+      expect(observers.values_at('ttl_gauge', 'ttl_counter').map(&:ttl)).to eq([120, 120])
+    end
+
+    it 'keeps a ttl given at registration' do
+      expect(observers['ttl_own_ttl_gauge'].ttl).to eq(5)
+    end
+
+    it 'builds plain metrics without it' do
+      expect(observers['ttl_plain_gauge']).to be_an_instance_of(PrometheusExporter::Metric::Gauge)
+    end
+
+    context 'when not set' do
+      before { collector_class.ttl = nil }
+
+      it 'keeps the metric default' do
+        expect(observers['ttl_gauge'].ttl).to eq(60)
+      end
+    end
+  end
 end

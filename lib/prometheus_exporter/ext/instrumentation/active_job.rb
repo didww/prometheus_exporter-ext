@@ -14,6 +14,12 @@ module PrometheusExporter::Ext::Instrumentation
 
     QUEUE_IVAR = :@_prometheus_exporter_queue
 
+    ERROR_EVENTS = {
+      'enqueue_retry.active_job' => :collect_enqueue_retried, # job retried due to error
+      'discard.active_job' => :collect_discarded, # job discarded due to error
+      'retry_stopped.active_job' => :collect_retry_stopped # retries stopped after max attempts reached
+    }.freeze
+
     class << self
       # @see https://guides.rubyonrails.org/active_support_instrumentation.html#active-job
       def subscribe(**)
@@ -38,31 +44,24 @@ module PrometheusExporter::Ext::Instrumentation
       private
 
       def subscribe_enqueue_events(instance)
-        # job enqueued
-        subscribe_event 'enqueue.active_job' do |event|
-          instance.collect_enqueued(
-            jobs: [event.payload[:job]],
-            adapter: event.payload[:adapter],
-            exception_object: event.payload[:exception_object]
-          )
-        end
-
-        # job enqueued with wait
-        subscribe_event 'enqueue_at.active_job' do |event|
-          instance.collect_enqueued(
-            jobs: [event.payload[:job]],
-            adapter: event.payload[:adapter],
-            exception_object: event.payload[:exception_object]
-          )
+        # job enqueued, with or without wait
+        ['enqueue.active_job', 'enqueue_at.active_job'].each do |name|
+          subscribe_event(name) do |event|
+            payload = event.payload
+            instance.collect_enqueued(
+              jobs: [payload[:job]], adapter: payload[:adapter], exception_object: payload[:exception_object]
+            )
+          end
         end
 
         # multiple jobs enqueued at once
         subscribe_event 'enqueue_all.active_job' do |event|
+          payload = event.payload
           instance.collect_enqueued(
-            jobs: event.payload[:jobs],
-            adapter: event.payload[:adapter],
-            exception_object: event.payload[:exception_object],
-            enqueued_count: event.payload[:enqueued_count]
+            jobs: payload[:jobs],
+            adapter: payload[:adapter],
+            exception_object: payload[:exception_object],
+            enqueued_count: payload[:enqueued_count]
           )
         end
       end
@@ -70,50 +69,28 @@ module PrometheusExporter::Ext::Instrumentation
       def subscribe_perform_events(instance)
         # job perform started
         subscribe_event 'perform_start.active_job' do |event|
-          instance.collect_started(
-            job: event.payload[:job],
-            adapter: event.payload[:adapter]
-          )
+          instance.collect_started(job: event.payload[:job], adapter: event.payload[:adapter])
         end
 
         # job perform completed (both success and failure)
         monotonic_subscribe_event 'perform.active_job' do |event|
+          payload = event.payload
           instance.collect_performed(
-            job: event.payload[:job],
-            adapter: event.payload[:adapter],
-            exception: event.payload[:exception],
+            job: payload[:job],
+            adapter: payload[:adapter],
+            exception: payload[:exception],
             duration_ms: event.duration,
-            aborted: event.payload[:aborted]
+            aborted: payload[:aborted]
           )
         end
       end
 
       def subscribe_error_events(instance)
-        # job retried due to error
-        subscribe_event 'enqueue_retry.active_job' do |event|
-          instance.collect_enqueue_retried(
-            job: event.payload[:job],
-            adapter: event.payload[:adapter],
-            error: event.payload[:error]
-          )
-        end
-
-        # job discarded due to error
-        subscribe_event 'discard.active_job' do |event|
-          instance.collect_discarded(
-            job: event.payload[:job],
-            adapter: event.payload[:adapter],
-            error: event.payload[:error]
-          )
-        end
-
-        # job retried stopped after max retry attempts reached
-        subscribe_event 'retry_stopped.active_job' do |event|
-          instance.collect_retry_stopped(
-            job: event.payload[:job],
-            adapter: event.payload[:adapter],
-            error: event.payload[:error]
-          )
+        ERROR_EVENTS.each do |name, handler|
+          subscribe_event(name) do |event|
+            payload = event.payload
+            instance.public_send(handler, job: payload[:job], adapter: payload[:adapter], error: payload[:error])
+          end
         end
       end
 
@@ -200,40 +177,23 @@ module PrometheusExporter::Ext::Instrumentation
     def collect_enqueue_retried(job:, adapter:, error:)
       safe_collect do
         # Rails publishes enqueue_retry.active_job even when the re-enqueue failed.
-        next unless job.successfully_enqueued?
-
-        collect_data(
-          {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
-            retried_total: 1
-          }
-        )
+        collect_data({ labels: error_labels(job, adapter, error), retried_total: 1 }) if job.successfully_enqueued?
       end
     end
 
     def collect_discarded(job:, adapter:, error:)
-      safe_collect do
-        collect_data(
-          {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
-            discarded_total: 1
-          }
-        )
-      end
+      safe_collect { collect_data({ labels: error_labels(job, adapter, error), discarded_total: 1 }) }
     end
 
     def collect_retry_stopped(job:, adapter:, error:)
-      safe_collect do
-        collect_data(
-          {
-            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name),
-            retry_stopped_total: 1
-          }
-        )
-      end
+      safe_collect { collect_data({ labels: error_labels(job, adapter, error), retry_stopped_total: 1 }) }
     end
 
     private
+
+    def error_labels(job, adapter, error)
+      job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name)
+    end
 
     def job_labels(job, adapter, queue: job.queue_name.to_s, **extra)
       {

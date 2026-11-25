@@ -71,6 +71,24 @@ RSpec.describe PrometheusExporter::Ext::Server::SolidQueueCollector do
     end
   end
 
+  describe '.ttl' do
+    around do |example|
+      original = described_class.ttl
+      example.run
+    ensure
+      described_class.ttl = original
+    end
+
+    it 'keeps the gauge default of 60 seconds' do
+      expect(collector.metrics.map(&:ttl)).to all(eq(60))
+    end
+
+    it 'applies to a new collector instance' do
+      described_class.ttl = 180
+      expect(collector.metrics.map(&:ttl)).to all(eq(180))
+    end
+  end
+
   context 'with an unknown key in payload' do
     let(:metric) { super().merge(unknown_key: 99) }
 

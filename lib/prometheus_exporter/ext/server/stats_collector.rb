@@ -16,6 +16,10 @@ module PrometheusExporter::Ext::Server
     end
 
     module ClassMethods
+      # Seconds an expiring metric keeps a label set without updates, for metrics registered without `ttl:`.
+      # nil keeps each metric's default. Set it before the collector is instantiated.
+      attr_accessor :ttl
+
       # Registers PrometheusExporter::Metric::GaugeWithExpire observer.
       # @param name [Symbol] metric name.
       # @param help [String] metric description.
@@ -35,7 +39,7 @@ module PrometheusExporter::Ext::Server
 
     def initialize
       super
-      @observers = build_observers
+      @observers = build_stats_observers
     end
 
     # Returns all metrics collected by this collector.
@@ -49,6 +53,19 @@ module PrometheusExporter::Ext::Server
     def collect(obj)
       obj = normalize_labels(obj)
       fill_observers(@observers, obj)
+    end
+
+    private
+
+    # BaseCollectorMethods#build_observers ignores the collector ttl.
+    def build_stats_observers
+      self.class.registered_metrics.to_h do |name, metric|
+        args = metric[:args]
+        if self.class.ttl && metric[:metric_class] < PrometheusExporter::Ext::Metric::Expiring
+          args = [{ ttl: self.class.ttl }.merge(args.first || {})]
+        end
+        [name, metric[:metric_class].new("#{type}_#{name}", metric[:help], *args)]
+      end
     end
   end
 end

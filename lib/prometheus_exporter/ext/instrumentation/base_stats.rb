@@ -10,7 +10,7 @@ module PrometheusExporter::Ext::Instrumentation
     end
 
     # @param on_error [#call, nil] receives the exception raised inside #safe_collect.
-    #   Defaults to printing a warning.
+    #   Defaults to printing a warning. If the handler raises, both errors are printed as warnings.
     def initialize(client: PrometheusExporter::Client.default, labels: {}, on_error: nil)
       @labels = labels.transform_keys(&:to_sym)
       @client = client
@@ -31,8 +31,16 @@ module PrometheusExporter::Ext::Instrumentation
     def safe_collect
       yield
     rescue StandardError => e
-      @on_error.call(e)
+      report_error(e)
       nil
+    end
+
+    # ActiveSupport::Notifications re-raises subscriber errors into the app, so a failing handler must not raise.
+    def report_error(error)
+      @on_error.call(error)
+    rescue StandardError => e
+      warn_error(error)
+      warn_error(e)
     end
 
     def warn_error(error)

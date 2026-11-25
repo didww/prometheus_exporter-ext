@@ -214,6 +214,13 @@ for `ttl` seconds (default 60) is removed, and if it reports again it starts fro
 register_counter_with_expire :processed_total, 'count of processed items', ttl: 300
 ```
 
+To set one TTL for every expiring metric of a collector that doesn't pass `ttl:` itself, set the
+collector's `ttl` before you create it. A `ttl:` given at registration still wins.
+
+```ruby
+MyCollector.ttl = 300
+```
+
 #### `ExpiredStatsCollector` for whole-collector expiration
 
 Use `ExpiredStatsCollector` when you want **all** metric data removed after expiration.
@@ -327,6 +334,12 @@ server.collector.register_collector(PrometheusExporter::Ext::Server::SolidQueueC
 
 This exposes the expiring gauges `solid_queue_ready_count`, `solid_queue_scheduled_count`,
 `solid_queue_claimed_count`, `solid_queue_blocked_count`, and `solid_queue_failed_count`.
+The gauges expire after 60 seconds without data. If `frequency` is 60 seconds or more, raise the TTL
+before you create the collector:
+
+```ruby
+PrometheusExporter::Ext::Server::SolidQueueCollector.ttl = 180
+```
 
 ### Request middleware labels
 

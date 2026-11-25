@@ -79,8 +79,6 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::SolidQueue do
   end
 
   describe '.start' do
-    let(:errors) { [] }
-
     before do
       allow(ready_execution).to receive(:count).and_raise(StandardError, 'DB error')
     end
@@ -90,9 +88,9 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::SolidQueue do
     end
 
     it 'forwards on_error to the instrumentation' do
+      errors = Queue.new
       described_class.start(frequency: 60, on_error: ->(error) { errors << error })
-      sleep 0.1
-      expect(errors).to contain_exactly(an_instance_of(StandardError))
+      expect(errors.pop(timeout: 2)).to be_an_instance_of(StandardError)
     end
   end
 end

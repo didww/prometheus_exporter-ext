@@ -2,9 +2,12 @@
 
 require 'prometheus_exporter/metric'
 require_relative '../../ext'
+require_relative 'expiring'
 
 module PrometheusExporter::Ext::Metric
   class GaugeWithExpire < PrometheusExporter::Metric::Gauge
+    include Expiring
+
     NULLIFY_STRATEGY_UPDATE = ->(labels) { expiration_times[labels] = now_time + ttl }.freeze
     NULLIFY_STRATEGY_EXPIRE = ->(labels) { data.delete(labels) }.freeze
     ZEROING_STRATEGY_UPDATE = ->(labels) do
@@ -28,19 +31,11 @@ module PrometheusExporter::Ext::Metric
           zeroing: { on_update: ZEROING_STRATEGY_UPDATE, on_expire: ZEROING_STRATEGY_EXPIRE }
         }
       end
-
-      def default_ttl
-        60
-      end
     end
-
-    attr_reader :ttl, :expiration_times
 
     def initialize(name, help, opts = {})
       super(name, help)
-      @ttl = opts[:ttl] || self.class.default_ttl
-      raise ArgumentError, ':ttl must be numeric' unless ttl.is_a?(Numeric)
-      raise ArgumentError, ":ttl must be greater than zero: #{ttl.inspect}" unless ttl.positive?
+      init_ttl(opts)
 
       @strategy = self.class.strategies.fetch(opts[:strategy] || :removing) do
         raise ArgumentError, "Unknown strategy: #{opts[:strategy].inspect}"
@@ -108,10 +103,6 @@ module PrometheusExporter::Ext::Metric
 
     def remove_expired_at(labels)
       expiration_times.delete(labels)
-    end
-
-    def now_time
-      ::Process.clock_gettime(::Process::CLOCK_MONOTONIC)
     end
   end
 end

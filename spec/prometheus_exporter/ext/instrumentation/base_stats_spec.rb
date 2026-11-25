@@ -153,5 +153,15 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
         expect(errors).to contain_exactly(an_instance_of(ArgumentError))
       end
     end
+
+    context 'when the on_error handler raises' do
+      let(:instrumentation) { TestInstrumentation.new(on_error: ->(_error) { raise 'handler down' }) }
+
+      it 'warns about both errors instead of raising' do
+        expect { subject }.to output(
+          /ArgumentError: boom.*RuntimeError: handler down/m
+        ).to_stderr
+      end
+    end
   end
 end
