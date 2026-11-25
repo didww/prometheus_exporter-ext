@@ -133,4 +133,35 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::BaseStats do
       expect { subject }.not_to send_metrics
     end
   end
+
+  describe '#safe_collect' do
+    subject do
+      instrumentation.send(:safe_collect) { raise ArgumentError, 'boom' }
+    end
+
+    it 'warns by default' do
+      expect { subject }.to output(/TestInstrumentation: ArgumentError: boom/).to_stderr
+    end
+
+    context 'with on_error handler' do
+      let(:instrumentation) { TestInstrumentation.new(on_error:) }
+      let(:on_error) { ->(error) { errors << error } }
+      let(:errors) { [] }
+
+      it 'passes the error to the handler' do
+        expect { subject }.not_to output.to_stderr
+        expect(errors).to contain_exactly(an_instance_of(ArgumentError))
+      end
+    end
+
+    context 'when the on_error handler raises' do
+      let(:instrumentation) { TestInstrumentation.new(on_error: ->(_error) { raise 'handler down' }) }
+
+      it 'warns about both errors instead of raising' do
+        expect { subject }.to output(
+          /ArgumentError: boom.*RuntimeError: handler down/m
+        ).to_stderr
+      end
+    end
+  end
 end

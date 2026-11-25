@@ -215,4 +215,83 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
       end
     end
   end
+
+  describe '.register_counter_with_expire' do
+    let(:collector_class) do
+      Class.new(PrometheusExporter::Server::TypeCollector) do
+        include PrometheusExporter::Ext::Server::StatsCollector
+
+        self.type = 'cwe'
+        register_counter_with_expire :c_metric, 'help', ttl: 5
+      end
+    end
+    let(:collector) { collector_class.new }
+    let(:observer) { collector.metrics.first }
+
+    it 'registers a counter with expire using the given ttl' do
+      expect(observer).to be_a(PrometheusExporter::Ext::Metric::CounterWithExpire)
+      expect(observer.ttl).to eq(5)
+    end
+
+    it 'accumulates values' do
+      collector.collect(deep_stringify_keys(labels: { qwe: 'asd' }, c_metric: 1.5))
+      collector.collect(deep_stringify_keys(labels: { qwe: 'asd' }, c_metric: 2))
+      expect(observer.to_h).to eq({ 'qwe' => 'asd' } => 3.5)
+    end
+  end
+
+  describe '.ttl' do
+    let(:collector_class) do
+      Class.new(PrometheusExporter::Server::TypeCollector) do
+        include PrometheusExporter::Ext::Server::StatsCollector
+
+        self.type = 'ttl'
+        self.ttl = 120
+        register_gauge_with_expire :gauge, 'help'
+        register_counter_with_expire :counter, 'help'
+        register_gauge_with_expire :own_ttl_gauge, 'help', ttl: 5
+        register_gauge :plain_gauge, 'help'
+      end
+    end
+    let(:observers) { collector_class.new.metrics.to_h { |metric| [metric.name, metric] } }
+
+    it 'applies to expiring metrics registered without ttl' do
+      expect(observers.values_at('ttl_gauge', 'ttl_counter').map(&:ttl)).to eq([120, 120])
+    end
+
+    it 'keeps a ttl given at registration' do
+      expect(observers['ttl_own_ttl_gauge'].ttl).to eq(5)
+    end
+
+    it 'builds plain metrics without it' do
+      expect(observers['ttl_plain_gauge']).to be_an_instance_of(PrometheusExporter::Metric::Gauge)
+    end
+
+    context 'when an expiring metric takes more constructor arguments' do
+      let(:scaled_gauge_class) do
+        Class.new(PrometheusExporter::Ext::Metric::GaugeWithExpire) do
+          attr_reader :scale
+
+          def initialize(name, help, opts, scale) # rubocop:disable Metrics/ParameterLists
+            super(name, help, opts)
+            @scale = scale
+          end
+        end
+      end
+
+      before { collector_class.register_metric(:scaled_gauge, 'help', scaled_gauge_class, {}, 10) }
+
+      it 'keeps them' do
+        expect(observers['ttl_scaled_gauge']).to have_attributes(ttl: 120, scale: 10)
+      end
+    end
+
+    context 'when not set' do
+      before { collector_class.ttl = nil }
+
+      it 'keeps the metric default' do
+        expect(observers['ttl_gauge'].ttl).to eq(60)
+      end
+    end
+  end
 end
