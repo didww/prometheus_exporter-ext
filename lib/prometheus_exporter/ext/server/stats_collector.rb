@@ -62,7 +62,7 @@ module PrometheusExporter::Ext::Server
       self.class.registered_metrics.to_h do |name, metric|
         args = metric[:args]
         if self.class.ttl && metric[:metric_class] < PrometheusExporter::Ext::Metric::Expiring
-          args = [{ ttl: self.class.ttl }.merge(args.first || {})]
+          args = [{ ttl: self.class.ttl }.merge(args.first || {}), *args.drop(1)]
         end
         [name, metric[:metric_class].new("#{type}_#{name}", metric[:help], *args)]
       end

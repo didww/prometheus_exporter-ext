@@ -267,6 +267,25 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
       expect(observers['ttl_plain_gauge']).to be_an_instance_of(PrometheusExporter::Metric::Gauge)
     end
 
+    context 'when an expiring metric takes more constructor arguments' do
+      let(:scaled_gauge_class) do
+        Class.new(PrometheusExporter::Ext::Metric::GaugeWithExpire) do
+          attr_reader :scale
+
+          def initialize(name, help, opts, scale) # rubocop:disable Metrics/ParameterLists
+            super(name, help, opts)
+            @scale = scale
+          end
+        end
+      end
+
+      before { collector_class.register_metric(:scaled_gauge, 'help', scaled_gauge_class, {}, 10) }
+
+      it 'keeps them' do
+        expect(observers['ttl_scaled_gauge']).to have_attributes(ttl: 120, scale: 10)
+      end
+    end
+
     context 'when not set' do
       before { collector_class.ttl = nil }
 
