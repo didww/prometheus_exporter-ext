@@ -12,9 +12,11 @@ few features the base gem doesn't provide:
 
 - **Instrumentation DSL** for both event-driven (`BaseStats`) and periodic (`PeriodicStats`) metrics.
 - **Collector DSL** (`register_gauge`, `register_counter`, `register_metric`, …) to declare metrics declaratively.
-- **Expiring gauges** — automatically remove or zero stale metrics via `gauge_with_expire` / `ExpiredStatsCollector`,
-  so you don't keep exporting values for things that stopped reporting.
+- **Expiring gauges and counters** — automatically remove or zero stale metrics via `gauge_with_expire`,
+  `counter_with_expire` / `ExpiredStatsCollector`, so you don't keep exporting values for things that stopped reporting.
 - **Built-in process CPU instrumentation** (`ProcCpu`) reading from `/proc/self/stat`.
+- **Built-in ActiveJob and Solid Queue instrumentations** with matching collectors.
+- **A request middleware** that adds your own labels to `prometheus_exporter` HTTP request metrics.
 - **A singleton web server** helper for embedding the exporter web server in your app.
 - **RSpec matchers** to test your instrumentations and collectors without standing up a real server.
 
@@ -27,6 +29,9 @@ few features the base gem doesn't provide:
   - [Periodic metrics](#periodic-metrics)
   - [Collectors and expiring metrics](#collectors-and-expiring-metrics)
   - [Built-in process CPU metrics](#built-in-process-cpu-metrics)
+  - [ActiveJob metrics](#activejob-metrics)
+  - [Solid Queue metrics](#solid-queue-metrics)
+  - [Request middleware labels](#request-middleware-labels)
   - [Singleton web server](#singleton-web-server)
 - [Testing](#testing)
 - [Development](#development)
@@ -90,6 +95,20 @@ module Prometheus
     end
   end
 end
+```
+
+Instead of the `rescue` block, you can wrap the work in the private `safe_collect` helper.
+It passes any `StandardError` to the `on_error:` callable given to `new` (or `start` for periodic stats)
+and prints a warning when no handler is set:
+
+```ruby
+def collect(duration, operation)
+  safe_collect do
+    collect_data(labels: { operation_name: operation }, last_duration_seconds: duration)
+  end
+end
+
+Prometheus::MyInstrumentation.new(on_error: ->(e) { Rails.error.report(e, handled: true) })
 ```
 
 Then send metrics from your code:
@@ -188,6 +207,13 @@ module Prometheus
 end
 ```
 
+`register_counter_with_expire` works the same way for counters: a label set that is not updated
+for `ttl` seconds (default 60) is removed, and if it reports again it starts from zero.
+
+```ruby
+register_counter_with_expire :processed_total, 'count of processed items', ttl: 300
+```
+
 #### `ExpiredStatsCollector` for whole-collector expiration
 
 Use `ExpiredStatsCollector` when you want **all** metric data removed after expiration.
@@ -240,7 +266,81 @@ server.collector.register_collector(PrometheusExporter::Ext::Server::ProcCpuColl
 ```
 
 This exposes `proc_cpu_usage_seconds_total` (a counter, in core-seconds) labeled with
-`type`, `pid`, and `hostname`.
+`type`, `pid`, and `hostname`. A series that receives no data for 300 seconds is removed,
+so processes that exited don't stay in the output. To change the TTL, set it before you create the collector:
+
+```ruby
+PrometheusExporter::Ext::Server::ProcCpuCollector.ttl = 600
+```
+
+### ActiveJob metrics
+
+The ActiveJob instrumentation subscribes to `ActiveSupport::Notifications` events of ActiveJob.
+It needs ActiveSupport and ActiveJob, which this gem doesn't depend on, so load it explicitly
+from a Rails app, for example in an initializer:
+
+```ruby
+require 'prometheus_exporter/ext/instrumentation/active_job'
+
+PrometheusExporter::Ext::Instrumentation::ActiveJob.subscribe(
+  on_error: ->(e) { Rails.error.report(e, handled: true) } # optional, defaults to a warning
+)
+# to stop: PrometheusExporter::Ext::Instrumentation::ActiveJob.unsubscribe
+```
+
+In the exporter server:
+
+```ruby
+require 'prometheus_exporter/ext/server/active_job_collector'
+
+server.collector.register_collector(PrometheusExporter::Ext::Server::ActiveJobCollector.new)
+```
+
+This exposes these counters, labeled with `job_class`, `adapter`, `queue`, and, where they apply,
+`executions`, `scheduled`, and `error` (an exception class name):
+`active_job_enqueued_total`, `active_job_fail_enqueued_total`, `active_job_executed_total`,
+`active_job_success_total`, `active_job_failed_total`, `active_job_retried_total`,
+`active_job_retry_stopped_total`, `active_job_discarded_total`, `active_job_duration_seconds`, and
+`active_job_latency_seconds`. Latency of a scheduled job counts from its `scheduled_at`, not from enqueue time.
+
+### Solid Queue metrics
+
+A periodic instrumentation that counts Solid Queue executions. Load it explicitly in an app
+that uses Solid Queue:
+
+```ruby
+require 'prometheus_exporter/ext/instrumentation/solid_queue'
+
+PrometheusExporter::Ext::Instrumentation::SolidQueue.start(
+  frequency: 30,
+  on_error: ->(e) { Rails.error.report(e, handled: true) } # optional, defaults to a warning
+)
+```
+
+In the exporter server:
+
+```ruby
+require 'prometheus_exporter/ext/server/solid_queue_collector'
+
+server.collector.register_collector(PrometheusExporter::Ext::Server::SolidQueueCollector.new)
+```
+
+This exposes the expiring gauges `solid_queue_ready_count`, `solid_queue_scheduled_count`,
+`solid_queue_claimed_count`, `solid_queue_blocked_count`, and `solid_queue_failed_count`.
+
+### Request middleware labels
+
+`PrometheusExporter::Ext::RequestMiddleware` is a `PrometheusExporter::Middleware` that adds
+fixed labels to every request metric, for example to tell apart processes that serve different traffic:
+
+```ruby
+require 'prometheus_exporter/ext/request_middleware'
+
+Rails.application.middleware.unshift PrometheusExporter::Ext::RequestMiddleware, labels: { type: 'web' }
+```
+
+It accepts the same options as `PrometheusExporter::Middleware` (`instrument:`, `client:`).
+When you omit `instrument:`, it stays `:alias_method`, as in the parent class.
 
 ### Singleton web server
 
@@ -307,7 +407,7 @@ end
 ```
 
 Test a collector with the metric matchers
-(`a_gauge_metric`, `a_counter_metric`, `a_gauge_with_expire_metric`, …):
+(`a_gauge_metric`, `a_counter_metric`, `a_gauge_with_expire_metric`, `a_counter_with_expire_metric`, …):
 
 ```ruby
 RSpec.describe Prometheus::MyCollector do
