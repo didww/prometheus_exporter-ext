@@ -215,4 +215,28 @@ RSpec.describe PrometheusExporter::Ext::Server::StatsCollector do
       end
     end
   end
+
+  describe '.register_counter_with_expire' do
+    let(:collector_class) do
+      Class.new(PrometheusExporter::Server::TypeCollector) do
+        include PrometheusExporter::Ext::Server::StatsCollector
+
+        self.type = 'cwe'
+        register_counter_with_expire :c_metric, 'help', ttl: 5
+      end
+    end
+    let(:collector) { collector_class.new }
+    let(:observer) { collector.metrics.first }
+
+    it 'registers a counter with expire using the given ttl' do
+      expect(observer).to be_a(PrometheusExporter::Ext::Metric::CounterWithExpire)
+      expect(observer.ttl).to eq(5)
+    end
+
+    it 'accumulates values' do
+      collector.collect(deep_stringify_keys(labels: { qwe: 'asd' }, c_metric: 1.5))
+      collector.collect(deep_stringify_keys(labels: { qwe: 'asd' }, c_metric: 2))
+      expect(observer.to_h).to eq({ 'qwe' => 'asd' } => 3.5)
+    end
+  end
 end

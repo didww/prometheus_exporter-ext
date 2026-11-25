@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'date'
+require_relative '../metric/counter_with_expire'
 require_relative 'metric_matcher'
 require_relative 'send_metrics_matcher'
 
@@ -25,6 +26,10 @@ module PrometheusExporter::Ext::RSpec
 
     def a_counter_metric(name)
       a_prometheus_metric(PrometheusExporter::Metric::Counter, name)
+    end
+
+    def a_counter_with_expire_metric(name)
+      a_prometheus_metric(PrometheusExporter::Ext::Metric::CounterWithExpire, name)
     end
 
     def a_histogram_metric(name)

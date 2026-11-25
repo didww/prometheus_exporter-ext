@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'base_collector_methods'
+require_relative '../metric/counter_with_expire'
 
 module PrometheusExporter::Ext::Server
   module StatsCollector
@@ -21,6 +22,14 @@ module PrometheusExporter::Ext::Server
       # @param opts [Hash] additional options, supports `ttl` and `strategy` keys.
       def register_gauge_with_expire(name, help, opts = {})
         register_metric(name, help, PrometheusExporter::Ext::Metric::GaugeWithExpire, opts)
+      end
+
+      # Registers PrometheusExporter::Ext::Metric::CounterWithExpire observer.
+      # @param name [Symbol] metric name.
+      # @param help [String] metric description.
+      # @param opts [Hash] additional options, supports `ttl` key.
+      def register_counter_with_expire(name, help, opts = {})
+        register_metric(name, help, PrometheusExporter::Ext::Metric::CounterWithExpire, opts)
       end
     end
 
