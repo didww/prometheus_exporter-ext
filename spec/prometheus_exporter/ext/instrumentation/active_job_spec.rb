@@ -127,11 +127,11 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
     end
 
     context 'when the adapter enqueues in bulk without setting successfully_enqueued' do
+      let(:dropped_count) { 0 }
       let(:adapter_class) do
+        dropped = dropped_count
         Class.new do
-          def enqueue_all(jobs)
-            jobs.size
-          end
+          define_method(:enqueue_all) { |jobs| jobs.size - dropped }
 
           def enqueue(_job)
             nil
@@ -167,6 +167,25 @@ RSpec.describe PrometheusExporter::Ext::Instrumentation::ActiveJob do
             enqueued_total: 1
           }
         )
+      end
+
+      context 'when the adapter drops a job' do
+        let(:dropped_count) { 1 }
+
+        it 'keeps the totals of the enqueued_count payload' do
+          expect { subject }.to send_metrics(
+            {
+              type: 'active_job',
+              labels: { job_class: 'TestJob', adapter: 'BulkWithoutFlagsAdapter', queue: 'default' },
+              enqueued_total: 1
+            },
+            {
+              type: 'active_job',
+              labels: { job_class: 'TestJob', adapter: 'BulkWithoutFlagsAdapter', queue: 'default' },
+              fail_enqueued_total: 1
+            }
+          )
+        end
       end
     end
   end

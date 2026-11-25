@@ -108,13 +108,9 @@ module PrometheusExporter::Ext::Instrumentation
     end
 
     def collect_enqueued(jobs:, adapter:, exception_object: nil, enqueued_count: nil)
-      # Adapters implementing enqueue_all (e.g. Sidekiq) may not set successfully_enqueued on each job,
-      # so Rails' LogSubscriber#enqueue_all trusts the enqueued_count payload instead.
-      all_enqueued = !enqueued_count.nil? && enqueued_count.to_i == jobs.size
-
       safe_collect do
-        jobs.each do |job|
-          if all_enqueued || job.successfully_enqueued?
+        jobs.zip(enqueued_flags(jobs, enqueued_count)).each do |job, enqueued|
+          if enqueued
             # A retry re-enqueues a job that already ran; retried_total counts it.
             next if job.executions.to_i.positive?
 
@@ -193,6 +189,17 @@ module PrometheusExporter::Ext::Instrumentation
     end
 
     private
+
+    # Adapters implementing enqueue_all (e.g. Sidekiq) may report only enqueued_count without setting
+    # successfully_enqueued on each job. Then the totals follow enqueued_count, but which jobs failed is unknown,
+    # so the first enqueued_count jobs are counted as enqueued.
+    def enqueued_flags(jobs, enqueued_count)
+      flags = jobs.map(&:successfully_enqueued?)
+      return flags if enqueued_count.nil? || flags.any?
+
+      count = enqueued_count.to_i
+      jobs.each_index.map { |index| index < count }
+    end
 
     def error_labels(job, adapter, error)
       job_labels(job, adapter, executions: job.executions.to_s, error: error&.class&.name)
