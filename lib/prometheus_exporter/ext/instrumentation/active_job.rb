@@ -1,0 +1,251 @@
+# frozen_string_literal: true
+
+require 'time'
+require 'active_support'
+require 'active_support/notifications'
+require 'active_support/core_ext/object/blank'
+require 'active_support/core_ext/enumerable'
+require 'active_support/core_ext/time'
+require_relative 'base_stats'
+
+module PrometheusExporter::Ext::Instrumentation
+  class ActiveJob < BaseStats
+    self.type = 'active_job'
+
+    class << self
+      # @see https://guides.rubyonrails.org/active_support_instrumentation.html#active-job
+      def subscribe(**)
+        unsubscribe # ensures we don't double subscribe
+        instance = new(**)
+        @subscribers = []
+
+        subscribe_enqueue_events(instance)
+        subscribe_perform_events(instance)
+        subscribe_error_events(instance)
+      end
+
+      def unsubscribe
+        return unless defined?(@subscribers)
+
+        @subscribers.each do |sub_id|
+          ::ActiveSupport::Notifications.unsubscribe(sub_id)
+        end
+        @subscribers = []
+      end
+
+      private
+
+      def subscribe_enqueue_events(instance)
+        # job enqueued
+        subscribe_event 'enqueue.active_job' do |event|
+          instance.collect_enqueued(
+            jobs: [event.payload[:job]],
+            adapter: event.payload[:adapter],
+            exception_object: event.payload[:exception_object]
+          )
+        end
+
+        # job enqueued with wait
+        subscribe_event 'enqueue_at.active_job' do |event|
+          instance.collect_enqueued(
+            jobs: [event.payload[:job]],
+            adapter: event.payload[:adapter],
+            exception_object: event.payload[:exception_object]
+          )
+        end
+
+        # multiple jobs enqueued at once
+        subscribe_event 'enqueue_all.active_job' do |event|
+          instance.collect_enqueued(
+            jobs: event.payload[:jobs],
+            adapter: event.payload[:adapter],
+            exception_object: event.payload[:exception_object]
+          )
+        end
+      end
+
+      def subscribe_perform_events(instance)
+        # job perform started
+        subscribe_event 'perform_start.active_job' do |event|
+          instance.collect_started(
+            job: event.payload[:job],
+            adapter: event.payload[:adapter]
+          )
+        end
+
+        # job perform completed (both success and failure)
+        monotonic_subscribe_event 'perform.active_job' do |event|
+          instance.collect_performed(
+            job: event.payload[:job],
+            adapter: event.payload[:adapter],
+            exception: event.payload[:exception],
+            duration_ms: event.duration
+          )
+        end
+      end
+
+      def subscribe_error_events(instance)
+        # job retried due to error
+        subscribe_event 'enqueue_retry.active_job' do |event|
+          instance.collect_enqueue_retried(
+            job: event.payload[:job],
+            adapter: event.payload[:adapter],
+            error: event.payload[:error]
+          )
+        end
+
+        # job discarded due to error
+        subscribe_event 'discard.active_job' do |event|
+          instance.collect_discarded(
+            job: event.payload[:job],
+            adapter: event.payload[:adapter],
+            error: event.payload[:error]
+          )
+        end
+
+        # job retried stopped after max retry attempts reached
+        subscribe_event 'retry_stopped.active_job' do |event|
+          instance.collect_retry_stopped(
+            job: event.payload[:job],
+            adapter: event.payload[:adapter],
+            error: event.payload[:error]
+          )
+        end
+      end
+
+      def subscribe_event(name, &)
+        sub_id = ::ActiveSupport::Notifications.subscribe(name, &)
+        @subscribers << sub_id
+        sub_id
+      end
+
+      def monotonic_subscribe_event(name, &)
+        sub_id = ::ActiveSupport::Notifications.monotonic_subscribe(name, &)
+        @subscribers << sub_id
+        sub_id
+      end
+    end
+
+    def collect_enqueued(jobs:, adapter:, exception_object: nil)
+      safe_collect do
+        jobs.each do |job|
+          if job.successfully_enqueued?
+            collect_data(
+              {
+                labels: job_labels(job, adapter, scheduled: job.scheduled_at.present? ? 'true' : nil),
+                enqueued_total: 1
+              }
+            )
+          else
+            enqueue_error = exception_object || job.enqueue_error
+            collect_data(
+              {
+                labels: job_labels(job, adapter, error: enqueue_error&.class&.name),
+                fail_enqueued_total: 1
+              }
+            )
+          end
+        end
+      end
+    end
+
+    def collect_started(job:, adapter:, now: Time.current)
+      safe_collect do
+        latency_seconds = calculate_latency(job.enqueued_at, job.scheduled_at, now)
+        if latency_seconds.present?
+          collect_data(
+            {
+              labels: job_labels(job, adapter, executions: job.executions.to_s),
+              latency_seconds:
+            }
+          )
+        end
+      end
+    end
+
+    def collect_performed(job:, adapter:, exception:, duration_ms:)
+      safe_collect do
+        collect_data(
+          {
+            labels: job_labels(job, adapter, executions: job.executions.to_s),
+            executed_total: 1,
+            success_total: exception.present? ? nil : 1,
+            duration_seconds: ms2s(duration_ms)
+          }.compact
+        )
+
+        if exception.present?
+          collect_data(
+            {
+              labels: job_labels(job, adapter, executions: job.executions.to_s, error: exception.first.to_s),
+              failed_total: 1
+            }
+          )
+        end
+      end
+    end
+
+    def collect_enqueue_retried(job:, adapter:, error:)
+      safe_collect do
+        collect_data(
+          {
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            retried_total: 1
+          }
+        )
+      end
+    end
+
+    def collect_discarded(job:, adapter:, error:)
+      safe_collect do
+        collect_data(
+          {
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            discarded_total: 1
+          }
+        )
+      end
+    end
+
+    def collect_retry_stopped(job:, adapter:, error:)
+      safe_collect do
+        collect_data(
+          {
+            labels: job_labels(job, adapter, executions: job.executions.to_s, error: error.class.name),
+            retry_stopped_total: 1
+          }
+        )
+      end
+    end
+
+    private
+
+    def job_labels(job, adapter, **extra)
+      {
+        job_class: job.class.to_s,
+        adapter: adapter.class.name,
+        queue: job.queue_name.to_s,
+        **extra
+      }.compact_blank
+    end
+
+    def ms2s(milliseconds)
+      milliseconds = milliseconds.to_f
+      return 0 if milliseconds.zero?
+
+      (milliseconds / 1000.0).round(3)
+    end
+
+    # A scheduled job becomes runnable at scheduled_at, so the delay it was asked to wait is not latency.
+    def calculate_latency(enqueued_at, scheduled_at, now)
+      runnable_at = [enqueued_at, scheduled_at].compact_blank.map { |time| parse_time(time) }.max
+      return nil if runnable_at.nil?
+
+      [now - runnable_at, 0].max
+    end
+
+    def parse_time(time)
+      time.is_a?(String) ? Time.parse(time).utc : time
+    end
+  end
+end
